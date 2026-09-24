@@ -26,6 +26,12 @@ interface ChatDao {
     suspend fun deleteSession(session: ChatSessionEntity)
 
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
+    suspend fun getAllMessagesForSessionSync(sessionId: Long): List<ChatMessageEntity>
+
+    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
+    suspend fun getAllMessagesAcrossAllSessions(): List<ChatMessageEntity>
+
+    @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     fun getMessagesForSession(sessionId: Long): Flow<List<ChatMessageEntity>>
 
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp DESC LIMIT :limit")

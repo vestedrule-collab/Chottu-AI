@@ -12,6 +12,14 @@ class ChatRepository(private val chatDao: ChatDao) {
         return chatDao.getMessagesForSession(sessionId)
     }
 
+    suspend fun getAllMessagesForSession(sessionId: Long): List<ChatMessageEntity> {
+        return chatDao.getAllMessagesForSessionSync(sessionId)
+    }
+
+    suspend fun getAllPastMessagesAcrossAllSessions(): List<ChatMessageEntity> {
+        return chatDao.getAllMessagesAcrossAllSessions()
+    }
+
     suspend fun getRecentMessages(sessionId: Long, limit: Int = 10): List<ChatMessageEntity> {
         return chatDao.getRecentMessages(sessionId, limit)
     }

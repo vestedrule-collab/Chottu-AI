@@ -191,14 +191,29 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                // 3. Prepare recent turns for context
-                val history = recentMessages.reversed().map { it.role to it.content }
+                // 3. Prepare recent turns for current conversation context
+                val sessionMessages = repository.getAllMessagesForSession(sessionId)
+                val currentHistory = sessionMessages.takeLast(16).map { it.role to it.content }
 
-                // 4. Call Gemini 3.5 Flash
+                // Build long-term memory context from past conversations if user has multiple sessions/past chats
+                val allPastMessages = repository.getAllPastMessagesAcrossAllSessions()
+                val pastOtherMessages = allPastMessages.filter { it.sessionId != sessionId }
+                val longTermMemorySummary = if (pastOtherMessages.isNotEmpty()) {
+                    val keyUserInputs = pastOtherMessages
+                        .filter { it.role == "user" && it.content.isNotBlank() }
+                        .takeLast(15)
+                        .joinToString(separator = "\n- ") { it.content.take(150) }
+                    if (keyUserInputs.isNotBlank()) {
+                        "Past user queries and context discussed in prior chats:\n- $keyUserInputs"
+                    } else null
+                } else null
+
+                // 4. Call Gemini 3.5 Flash with full conversational context and long-term memory
                 val result = geminiService.generateResponse(
                     prompt = trimmed,
                     customApiKey = userCustomApiKey.value,
-                    conversationHistory = history,
+                    conversationHistory = currentHistory,
+                    longTermMemoryContext = longTermMemorySummary,
                     attachmentData = attachmentData
                 )
 

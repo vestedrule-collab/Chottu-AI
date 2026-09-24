@@ -31,11 +31,11 @@ class GeminiService {
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent"
         
         const val CHOTTU_SYSTEM_INSTRUCTION = 
-            "You are Chottu AI (छोटू AI), a brilliant, witty, and friendly voice & multimodal AI companion, inspired by Gemini and ChatGPT. " +
-            "You speak naturally, warmly, and conversationally like a true voice assistant. " +
-            "When responding for voice, keep explanations crisp, articulate, and punchy. " +
-            "When analyzing photos, diagrams, or documents, provide sharp, insightful observations. " +
-            "Always be helpful, encouraging, and sharp. Never give dull robotic replies."
+            "You are Chottu AI (छोटू AI), a world-class, brilliant, witty, and deeply empathetic voice & multimodal AI companion. " +
+            "CORE MEMORY CAPABILITY: You have persistent memory of past conversations and details the user shares with you (their name, preferences, past topics, questions, projects, ideas, and context). Always remember, refer back to, and build upon previous interactions whenever relevant to provide a deeply personalized experience. " +
+            "VOICE & CONVERSATION STYLE: You speak naturally, warmly, dynamically, and articulately. When replying for voice output, keep speech fluid, expressive, and concise. " +
+            "MULTIMODAL INTELLIGENCE: When photos, documents, or screenshots are provided, deliver sharp, insightful analysis. " +
+            "Always be encouraging, intellectually curious, and delightfully human. Never give robotic or evasive replies."
     }
 
     /**
@@ -61,6 +61,7 @@ class GeminiService {
         prompt: String,
         customApiKey: String? = null,
         conversationHistory: List<Pair<String, String>> = emptyList(), // role to text
+        longTermMemoryContext: String? = null,
         attachmentData: AttachmentData? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         val apiKey = getResolvedApiKey(customApiKey)
@@ -75,11 +76,17 @@ class GeminiService {
         try {
             val rootJson = JSONObject()
 
-            // System Instruction
+            // System Instruction with long term memory injection
+            val fullSystemInstruction = if (!longTermMemoryContext.isNullOrBlank()) {
+                "$CHOTTU_SYSTEM_INSTRUCTION\n\n[USER PAST MEMORY & CONTEXT FROM PREVIOUS CONVERSATIONS]:\n$longTermMemoryContext"
+            } else {
+                CHOTTU_SYSTEM_INSTRUCTION
+            }
+
             val systemInstructionJson = JSONObject().apply {
                 put("parts", JSONArray().apply {
                     put(JSONObject().apply {
-                        put("text", CHOTTU_SYSTEM_INSTRUCTION)
+                        put("text", fullSystemInstruction)
                     })
                 })
             }
@@ -88,9 +95,9 @@ class GeminiService {
             // Contents array (Conversation history + current prompt)
             val contentsArray = JSONArray()
 
-            // Add past turns for context (limit to last 6 turns for optimal latency)
-            val recentHistory = if (conversationHistory.size > 6) {
-                conversationHistory.takeLast(6)
+            // Add past turns for context (include up to 16 recent turns for full session continuity)
+            val recentHistory = if (conversationHistory.size > 16) {
+                conversationHistory.takeLast(16)
             } else {
                 conversationHistory
             }

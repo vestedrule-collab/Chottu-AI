@@ -96,6 +96,8 @@ import com.example.R
 import com.example.ui.components.AttachmentPreviewCard
 import com.example.ui.components.LiveVoiceOrb
 import com.example.ui.components.MessageItem
+import com.example.ui.components.MicPulseWaveFeedback
+import com.example.ui.components.RealTimeWaveformIndicator
 import com.example.ui.components.SoundWaveVisualizer
 import com.example.ui.components.WelcomeEmptyState
 import com.example.ui.theme.CosmicBackground
@@ -240,14 +242,21 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(vertical = 12.dp)
                     ) {
-                        androidx.compose.foundation.Image(
-                            painter = painterResource(id = R.drawable.img_app_icon),
-                            contentDescription = "Chottu AI",
+                        Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
+                                .clip(CircleShape)
+                                .background(Color.Black)
+                                .border(1.5.dp, Brush.linearGradient(listOf(CyanPrimary, VioletSecondary)), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = painterResource(id = R.drawable.ic_infinity_logo),
+                                contentDescription = "Chottu AI Infinity Logo",
+                                modifier = Modifier.size(30.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
@@ -380,7 +389,7 @@ fun ChatScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(34.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
@@ -389,14 +398,14 @@ fun ChatScreen(
                                     )
                                     .padding(2.dp)
                                     .clip(CircleShape)
-                                    .background(CosmicSurface),
+                                    .background(Color.Black),
                                 contentAlignment = Alignment.Center
                             ) {
                                 androidx.compose.foundation.Image(
-                                    painter = painterResource(id = R.drawable.img_app_icon),
-                                    contentDescription = "Chottu AI",
-                                    modifier = Modifier.size(26.dp),
-                                    contentScale = ContentScale.Crop
+                                    painter = painterResource(id = R.drawable.ic_infinity_logo),
+                                    contentDescription = "Chottu AI Infinity Logo",
+                                    modifier = Modifier.size(24.dp),
+                                    contentScale = ContentScale.Fit
                                 )
                             }
 
@@ -648,43 +657,75 @@ fun ChatScreen(
                     )
                 }
 
-                // Voice Recording Live Bar (When speaking directly into chat input)
+                // Real-Time Reactive Voice Wave Animation & Live Feedback Bar (When recording audio)
                 AnimatedVisibility(visible = voiceState == VoiceState.LISTENING && !isLiveVoiceModeOpen) {
                     Surface(
-                        color = Color(0xFF003847),
-                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        color = Color(0xFF041822),
+                        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CyanPrimary.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                SoundWaveVisualizer(
-                                    isActive = true,
-                                    color = CyanPrimary,
-                                    barCount = 6,
-                                    modifier = Modifier.height(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = if (partialSpeechText.isNotBlank()) "\"$partialSpeechText\"" else "Listening to your voice...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    MicPulseWaveFeedback(
+                                        isRecording = true,
+                                        rmsLevel = rmsLevel,
+                                        size = 36.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = if (partialSpeechText.isNotBlank()) "\"$partialSpeechText\"" else "Listening to your voice...",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color = Color.White,
+                                            maxLines = 2
+                                        )
+                                        Text(
+                                            text = "Reactive mic audio input • Tap stop when done",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = CyanPrimary.copy(alpha = 0.85f)
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.stopListening() },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2D1515))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = "Stop listening",
+                                        tint = PinkTertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
 
-                            IconButton(
-                                onClick = { viewModel.stopListening() },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Stop,
-                                    contentDescription = "Stop listening",
-                                    tint = PinkTertiary
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Continuous real-time reacting multi-frequency audio waveform
+                            RealTimeWaveformIndicator(
+                                rmsLevel = rmsLevel,
+                                isRecording = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                            )
                         }
                     }
                 }

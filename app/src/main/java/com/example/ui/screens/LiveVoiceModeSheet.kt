@@ -54,8 +54,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.ui.components.LiveVoiceOrb
+import com.example.ui.components.RealTimeWaveformIndicator
 import com.example.ui.components.SoundWaveVisualizer
 import com.example.ui.theme.CosmicBackground
 import com.example.ui.theme.CosmicBorder
@@ -120,18 +123,19 @@ fun LiveVoiceModeSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
-                            .background(
-                                when (voiceState) {
-                                    VoiceState.LISTENING -> CyanPrimary
-                                    VoiceState.SPEAKING -> VioletSecondary
-                                    VoiceState.THINKING -> Color(0xFFF59E0B)
-                                    else -> Color.Gray
-                                }
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                            .background(Color.Black)
+                            .border(1.dp, CyanPrimary, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.foundation.Image(
+                            painter = painterResource(id = R.drawable.ic_infinity_logo),
+                            contentDescription = "Chottu AI Infinity Logo",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "CHOTTU LIVE VOICE",
                         style = MaterialTheme.typography.titleMedium.copy(
@@ -243,10 +247,10 @@ fun LiveVoiceModeSheet(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (voiceState == VoiceState.SPEAKING) {
+                        if (voiceState == VoiceState.SPEAKING || voiceState == VoiceState.LISTENING) {
                             SoundWaveVisualizer(
                                 isActive = true,
-                                color = VioletSecondary,
+                                color = if (voiceState == VoiceState.LISTENING) CyanPrimary else VioletSecondary,
                                 barCount = 5,
                                 modifier = Modifier.height(16.dp)
                             )
@@ -254,7 +258,7 @@ fun LiveVoiceModeSheet(
                         }
                         Text(
                             text = when (voiceState) {
-                                VoiceState.LISTENING -> "Listening to you..."
+                                VoiceState.LISTENING -> "Listening to you in real-time..."
                                 VoiceState.THINKING -> "Chottu is thinking..."
                                 VoiceState.SPEAKING -> "Chottu is speaking (tap to interrupt)"
                                 VoiceState.ERROR -> "Tap to retry"
@@ -266,7 +270,19 @@ fun LiveVoiceModeSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Real-Time Audio Reactive Waveform indicator when listening
+                if (voiceState == VoiceState.LISTENING) {
+                    RealTimeWaveformIndicator(
+                        rmsLevel = rmsLevel,
+                        isRecording = true,
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .height(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // Real-time Speech Transcription / AI Reply
                 if (partialSpeechText.isNotBlank()) {

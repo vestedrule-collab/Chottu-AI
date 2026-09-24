@@ -103,14 +103,14 @@ fun MessageItem(
                         )
                         .padding(2.dp)
                         .clip(CircleShape)
-                        .background(CosmicSurface),
+                        .background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.foundation.Image(
-                        painter = painterResource(id = R.drawable.img_app_icon),
+                        painter = painterResource(id = R.drawable.ic_infinity_logo),
                         contentDescription = "Chottu AI Avatar",
-                        modifier = Modifier.size(28.dp),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier.size(24.dp),
+                        contentScale = ContentScale.Fit
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -476,26 +476,33 @@ fun WelcomeEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Holographic voice orb graphic
+        // Infinity AI logo graphic
         Box(
             modifier = Modifier
                 .size(110.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(CyanPrimary.copy(alpha = 0.4f), Color.Transparent)
+                        colors = listOf(CyanPrimary.copy(alpha = 0.35f), Color.Transparent)
                     )
-                ),
+                )
+                .border(2.dp, Brush.linearGradient(listOf(CyanPrimary, VioletSecondary)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            androidx.compose.foundation.Image(
-                painter = painterResource(id = R.drawable.img_chottu_avatar),
-                contentDescription = "Chottu AI Hero",
+            Box(
                 modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+                    .size(92.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = R.drawable.ic_infinity_logo),
+                    contentDescription = "Chottu AI Infinity Logo",
+                    modifier = Modifier.size(68.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
