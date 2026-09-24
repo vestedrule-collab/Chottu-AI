@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.LaptopWindows
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
@@ -268,6 +269,42 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Windows & Cross-Platform Support Guide
+                Surface(
+                    color = CosmicSurfaceVariant,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CosmicBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LaptopWindows,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Running on Windows PC",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "To run Chottu AI on Windows 10/11:\n" +
+                                    "1. Windows Subsystem for Android (WSA) — install the APK directly on Windows.\n" +
+                                    "2. Android Emulator (BlueStacks 5, LDPlayer, or Windows Android Studio) — double click app-debug.apk to run natively on your desktop.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

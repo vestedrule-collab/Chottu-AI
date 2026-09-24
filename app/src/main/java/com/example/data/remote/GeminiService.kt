@@ -154,6 +154,14 @@ class GeminiService {
             }
             rootJson.put("generationConfig", generationConfig)
 
+            // Google Search Grounding for real-time and up-to-date accurate information
+            val toolsArray = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("googleSearch", JSONObject())
+                })
+            }
+            rootJson.put("tools", toolsArray)
+
             val url = "$BASE_URL?key=$apiKey"
             val mediaType = "application/json; charset=utf-8".toMediaType()
             val requestBody = rootJson.toString().toRequestBody(mediaType)
@@ -199,6 +207,94 @@ class GeminiService {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * Automatically generates a short, descriptive 2-5 word title for a conversation thread
+     * based on the first few user-assistant exchanges.
+     */
+    suspend fun generateConversationTitle(
+        userPrompt: String,
+        assistantReply: String,
+        customApiKey: String? = null
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = getResolvedApiKey(customApiKey)
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("API key missing"))
+        }
+
+        try {
+            val rootJson = JSONObject()
+            val instructionJson = JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("text", "You create concise, descriptive, catchy titles for chat conversations. Output strictly and ONLY the title: 2 to 5 words maximum, plain text, no quotation marks, no markdown symbols, no trailing punctuation.")
+                    })
+                })
+            }
+            rootJson.put("systemInstruction", instructionJson)
+
+            val contentsArray = JSONArray()
+            val promptText = "Generate a short, descriptive title (2-5 words) for this chat conversation based on the exchange:\n\nUser: ${userPrompt.take(200)}\nAI: ${assistantReply.take(200)}\n\nTitle:"
+            val turnObj = JSONObject().apply {
+                put("role", "user")
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", promptText) })
+                })
+            }
+            contentsArray.put(turnObj)
+            rootJson.put("contents", contentsArray)
+
+            val generationConfig = JSONObject().apply {
+                put("temperature", 0.4)
+                put("maxOutputTokens", 24)
+            }
+            rootJson.put("generationConfig", generationConfig)
+
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=$apiKey"
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = rootJson.toString().toRequestBody(mediaType)
+
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseBodyString = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${response.code}"))
+                }
+
+                val jsonResponse = JSONObject(responseBodyString)
+                val candidates = jsonResponse.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val content = firstCandidate.optJSONObject("content")
+                    val parts = content?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val rawText = parts.getJSONObject(0).optString("text", "").trim()
+                        val sanitized = sanitizeTitle(rawText)
+                        if (sanitized.isNotBlank()) {
+                            return@withContext Result.success(sanitized)
+                        }
+                    }
+                }
+                Result.failure(Exception("Empty title response"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Sanitizes title string: strips outer quotes, markdown formatting, trailing colons/dots.
+     */
+    fun sanitizeTitle(raw: String): String {
+        var result = raw.trim()
+        result = result.replace(Regex("^(Title:|Topic:)\\s*", RegexOption.IGNORE_CASE), "")
+        result = result.trim { it in "\"':`#*._ \t\n\r" }
+        return result.take(38)
     }
 
     /**

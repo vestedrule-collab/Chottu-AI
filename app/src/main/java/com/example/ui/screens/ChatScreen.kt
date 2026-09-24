@@ -6,6 +6,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import android.app.Activity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,19 +44,28 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -68,6 +80,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -88,12 +101,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.ui.components.AttachmentPreviewCard
+import com.example.ui.components.AudioFrequencySpectrumVisualizer
 import com.example.ui.components.LiveVoiceOrb
 import com.example.ui.components.MessageItem
 import com.example.ui.components.MicPulseWaveFeedback
@@ -150,6 +165,13 @@ fun ChatScreen(
     val speechRate by viewModel.speechRate.collectAsStateWithLifecycle()
     val speechPitch by viewModel.speechPitch.collectAsStateWithLifecycle()
     val autoSpeakReplies by viewModel.autoSpeakReplies.collectAsStateWithLifecycle()
+
+    var showExportMenu by remember { mutableStateOf(false) }
+
+    // Conversation search & rename in sidebar
+    var drawerSearchQuery by remember { mutableStateOf("") }
+    var sessionToRename by remember { mutableStateOf<com.example.data.local.ChatSessionEntity?>(null) }
+    var renameInputText by remember { mutableStateOf("") }
 
     // Permission manager state for microphone
     var showMicPermissionDialog by remember { mutableStateOf(false) }
@@ -230,7 +252,7 @@ fun ChatScreen(
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = CosmicSurface,
-                modifier = Modifier.width(300.dp)
+                modifier = Modifier.width(320.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -240,7 +262,7 @@ fun ChatScreen(
                     // Drawer Header
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 12.dp)
+                        modifier = Modifier.padding(vertical = 10.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -258,14 +280,14 @@ fun ChatScreen(
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Chottu AI",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
                             Text(
-                                text = "Conversations",
+                                text = "${sessions.size} conversations",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = CyanPrimary
                             )
@@ -282,7 +304,7 @@ fun ChatScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+                            .padding(vertical = 6.dp)
                             .testTag("new_chat_drawer_button")
                     ) {
                         Icon(
@@ -298,61 +320,181 @@ fun ChatScreen(
                         )
                     }
 
-                    HorizontalDivider(
-                        color = CosmicBorder,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                    // Conversation Search & Filter Bar
+                    OutlinedTextField(
+                        value = drawerSearchQuery,
+                        onValueChange = { drawerSearchQuery = it },
+                        placeholder = {
+                            Text(
+                                "Search conversations...",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (drawerSearchQuery.isNotBlank()) {
+                                IconButton(
+                                    onClick = { drawerSearchQuery = "" },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear search",
+                                        tint = Color.Gray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyanPrimary,
+                            unfocusedBorderColor = CosmicBorder,
+                            focusedContainerColor = CosmicSurfaceVariant,
+                            unfocusedContainerColor = CosmicSurfaceVariant,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .testTag("drawer_search_input")
                     )
 
-                    // Sessions List
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(sessions, key = { it.id }) { session ->
-                            val isSelected = session.id == currentSessionId
-                            NavigationDrawerItem(
-                                label = {
-                                    Text(
-                                        text = session.title,
-                                        maxLines = 1,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) CyanPrimary else Color.White
-                                    )
-                                },
-                                selected = isSelected,
-                                onClick = {
-                                    viewModel.selectSession(session.id)
-                                    coroutineScope.launch { drawerState.close() }
-                                },
-                                icon = {
-                                    Icon(
-                                        imageVector = Icons.Default.ChatBubbleOutline,
-                                        contentDescription = null,
-                                        tint = if (isSelected) CyanPrimary else Color.Gray,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                },
-                                badge = {
-                                    if (sessions.size > 1) {
+                    HorizontalDivider(
+                        color = CosmicBorder,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+
+                    val filteredSessions = remember(sessions, drawerSearchQuery) {
+                        if (drawerSearchQuery.isBlank()) sessions
+                        else sessions.filter { it.title.contains(drawerSearchQuery, ignoreCase = true) }
+                    }
+
+                    // Sessions List in Sidebar
+                    if (filteredSessions.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "No matching conversations",
+                                    color = Color.Gray,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                TextButton(onClick = { drawerSearchQuery = "" }) {
+                                    Text("Show All", color = CyanPrimary, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(filteredSessions, key = { it.id }) { session ->
+                                val isSelected = session.id == currentSessionId
+                                Surface(
+                                    onClick = {
+                                        viewModel.selectSession(session.id)
+                                        coroutineScope.launch { drawerState.close() }
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) CosmicSurfaceVariant else Color.Transparent,
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, CyanPrimary.copy(alpha = 0.6f)) else null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("session_item_${session.id}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ChatBubbleOutline,
+                                            contentDescription = null,
+                                            tint = if (isSelected) CyanPrimary else Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = session.title,
+                                                maxLines = 1,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) CyanPrimary else Color.White,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = formatSessionRelativeTime(session.updatedAt),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.Gray
+                                                )
+                                                if (isSelected) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(CyanPrimary)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Rename Action
                                         IconButton(
-                                            onClick = { viewModel.deleteSession(session) },
-                                            modifier = Modifier.size(24.dp)
+                                            onClick = {
+                                                sessionToRename = session
+                                                renameInputText = session.title
+                                            },
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .testTag("rename_chat_${session.id}")
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = "Delete chat",
-                                                tint = Color.Gray.copy(alpha = 0.6f),
-                                                modifier = Modifier.size(16.dp)
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Rename conversation",
+                                                tint = Color.Gray.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(15.dp)
                                             )
                                         }
+
+                                        // Delete Action
+                                        if (sessions.size > 1) {
+                                            IconButton(
+                                                onClick = { viewModel.deleteSession(session) },
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .testTag("delete_chat_${session.id}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete chat",
+                                                    tint = Color.Gray.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
                                     }
-                                },
-                                colors = NavigationDrawerItemDefaults.colors(
-                                    selectedContainerColor = CosmicSurfaceVariant,
-                                    unselectedContainerColor = Color.Transparent
-                                ),
-                                shape = RoundedCornerShape(10.dp)
-                            )
+                                }
+                            }
                         }
                     }
 
@@ -411,12 +553,17 @@ fun ChatScreen(
 
                             Spacer(modifier = Modifier.width(10.dp))
 
-                            Column {
+                            val currentSession = sessions.find { it.id == currentSessionId }
+                            val activeTitle = currentSession?.title ?: "Chottu AI"
+
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "Chottu AI",
+                                        text = activeTitle,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Box(
@@ -438,10 +585,12 @@ fun ChatScreen(
                                         VoiceState.LISTENING -> "Listening..."
                                         VoiceState.SPEAKING -> "Speaking aloud..."
                                         VoiceState.THINKING -> "Thinking..."
-                                        else -> "Voice & Multimodal Assistant"
+                                        else -> if (activeTitle != "Chottu AI" && !activeTitle.startsWith("Conversation #")) "Chottu AI • Active Thread" else "Voice & Multimodal Assistant"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = CyanPrimary
+                                    color = CyanPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -489,6 +638,88 @@ fun ChatScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CyanPrimary
+                                )
+                            }
+                        }
+
+                        // Export Conversation Dropdown Button
+                        Box {
+                            IconButton(
+                                onClick = { showExportMenu = true },
+                                modifier = Modifier.testTag("export_menu_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Export Chat",
+                                    tint = CyanPrimary
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showExportMenu,
+                                onDismissRequest = { showExportMenu = false },
+                                modifier = Modifier
+                                    .background(CosmicSurface)
+                                    .border(1.dp, CosmicBorder, RoundedCornerShape(8.dp))
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(
+                                                text = "Export as Text (.txt)",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = "Human-readable transcript",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showExportMenu = false
+                                        viewModel.exportCurrentConversation(asJson = false)
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = null,
+                                            tint = CyanPrimary
+                                        )
+                                    },
+                                    modifier = Modifier.testTag("export_as_txt_option")
+                                )
+
+                                HorizontalDivider(color = CosmicBorder)
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(
+                                                text = "Export as JSON (.json)",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = "Structured backup & external apps",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        showExportMenu = false
+                                        viewModel.exportCurrentConversation(asJson = true)
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = null,
+                                            tint = VioletSecondary
+                                        )
+                                    },
+                                    modifier = Modifier.testTag("export_as_json_option")
                                 )
                             }
                         }
@@ -718,13 +949,14 @@ fun ChatScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Continuous real-time reacting multi-frequency audio waveform
-                            RealTimeWaveformIndicator(
+                            // Audio Frequency Bar spectrum and reactive waveform animation
+                            AudioFrequencySpectrumVisualizer(
                                 rmsLevel = rmsLevel,
                                 isRecording = true,
+                                barCount = 26,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(44.dp)
+                                    .height(48.dp)
                             )
                         }
                     }
@@ -924,6 +1156,86 @@ fun ChatScreen(
                 onDismiss = { viewModel.isSettingsOpen.value = false }
             )
         }
+
+        // Rename Conversation Dialog
+        if (sessionToRename != null) {
+            AlertDialog(
+                onDismissRequest = { sessionToRename = null },
+                containerColor = CosmicSurface,
+                title = {
+                    Text(
+                        text = "Rename Conversation",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "Provide a descriptive title for this conversation thread:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = renameInputText,
+                            onValueChange = { renameInputText = it },
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyanPrimary,
+                                unfocusedBorderColor = CosmicBorder,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = CosmicSurfaceVariant,
+                                unfocusedContainerColor = CosmicSurfaceVariant
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("rename_input_field")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val current = sessionToRename
+                            if (current != null && renameInputText.isNotBlank()) {
+                                viewModel.renameSession(current.id, renameInputText)
+                            }
+                            sessionToRename = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("save_rename_button")
+                    ) {
+                        Text("Save", color = Color(0xFF00363F), fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { sessionToRename = null },
+                        modifier = Modifier.testTag("cancel_rename_button")
+                    ) {
+                        Text("Cancel", color = Color.Gray)
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun formatSessionRelativeTime(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    return when {
+        diff < 60_000L -> "Just now"
+        diff < 3600_000L -> "${(diff / 60_000L).coerceAtLeast(1)}m ago"
+        diff < 86400_000L -> "${diff / 3600_000L}h ago"
+        diff < 86400_000L * 2 -> "Yesterday"
+        diff < 86400_000L * 7 -> "${diff / 86400_000L}d ago"
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
     }
 }
 

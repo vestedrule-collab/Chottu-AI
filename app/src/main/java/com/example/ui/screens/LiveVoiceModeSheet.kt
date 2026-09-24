@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.ui.components.AudioFrequencySpectrumVisualizer
 import com.example.ui.components.LiveVoiceOrb
 import com.example.ui.components.RealTimeWaveformIndicator
 import com.example.ui.components.SoundWaveVisualizer
@@ -272,16 +273,29 @@ fun LiveVoiceModeSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Real-Time Audio Reactive Waveform indicator when listening
+                // Real-Time Audio Frequency Bar Spectrum & Waveform animation when listening
                 if (voiceState == VoiceState.LISTENING) {
-                    RealTimeWaveformIndicator(
+                    AudioFrequencySpectrumVisualizer(
                         rmsLevel = rmsLevel,
                         isRecording = true,
+                        barCount = 32,
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .height(48.dp)
+                            .fillMaxWidth(0.92f)
+                            .height(60.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                } else if (voiceState == VoiceState.SPEAKING) {
+                    AudioFrequencySpectrumVisualizer(
+                        rmsLevel = 0.5f,
+                        isRecording = true,
+                        barCount = 32,
+                        primaryColor = VioletSecondary,
+                        secondaryColor = PinkTertiary,
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .height(60.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
                 // Real-time Speech Transcription / AI Reply

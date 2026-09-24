@@ -127,6 +127,44 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun renameSession(sessionId: Long, newTitle: String) {
+        viewModelScope.launch {
+            val trimmed = newTitle.trim()
+            if (trimmed.isNotBlank()) {
+                repository.updateSessionTitle(sessionId, trimmed)
+            }
+        }
+    }
+
+    fun autoGenerateSessionTitle(sessionId: Long, userPrompt: String, assistantReply: String) {
+        viewModelScope.launch {
+            try {
+                val titleResult = geminiService.generateConversationTitle(
+                    userPrompt = userPrompt,
+                    assistantReply = assistantReply,
+                    customApiKey = userCustomApiKey.value
+                )
+                titleResult.onSuccess { cleanTitle ->
+                    if (cleanTitle.isNotBlank()) {
+                        repository.updateSessionTitle(sessionId, cleanTitle)
+                    }
+                }.onFailure {
+                    // Fallback to intelligent clean summary
+                    val fallback = if (userPrompt.length > 26) {
+                        userPrompt.take(24).trim() + "..."
+                    } else {
+                        userPrompt.trim()
+                    }
+                    if (fallback.isNotBlank()) {
+                        repository.updateSessionTitle(sessionId, fallback)
+                    }
+                }
+            } catch (e: Exception) {
+                // Background title generation fails gracefully without interrupting chat
+            }
+        }
+    }
+
     fun attachFile(uri: Uri, isImage: Boolean, fileName: String?) {
         attachedUri.value = uri
         isAttachedImage.value = isImage
@@ -226,6 +264,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         timestamp = System.currentTimeMillis()
                     )
                     val insertedId = repository.addMessage(assistantMsg)
+
+                    // Auto-generate short, descriptive title based on first few exchanges
+                    val currentSession = allSessions.value.find { it.id == sessionId }
+                    val shouldAutoTitle = sessionMessages.size <= 2 ||
+                            currentSession?.title?.startsWith("New Conversation") == true ||
+                            currentSession?.title?.startsWith("Conversation #") == true ||
+                            currentSession?.title?.endsWith("...") == true
+                    if (shouldAutoTitle && trimmed.isNotBlank()) {
+                        autoGenerateSessionTitle(sessionId, trimmed, reply)
+                    }
 
                     // Speak aloud if in Live Voice mode or auto-speak enabled
                     if (isLiveVoiceModeOpen.value || autoSpeakReplies.value) {
@@ -328,6 +376,41 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun testVoice() {
         voiceManager.speak("Hello! I am Chottu AI, your voice assistant. Ready to help you with anything!")
+    }
+
+    fun exportCurrentConversation(asJson: Boolean) {
+        viewModelScope.launch {
+            val sessionId = _currentSessionId.value
+            val session = allSessions.value.find { it.id == sessionId }
+            val messages = currentMessages.value
+            if (messages.isEmpty()) {
+                errorMessage.value = "No messages to export in this conversation."
+                return@launch
+            }
+
+            val sanitizedTitle = (session?.title ?: "chat")
+                .replace(Regex("[^a-zA-Z0-9_-]"), "_")
+                .take(25)
+            val timestamp = System.currentTimeMillis()
+
+            if (asJson) {
+                val jsonString = com.example.util.ChatExportManager.generateJsonExport(session, messages)
+                com.example.util.ChatExportManager.saveAndShareExportFile(
+                    context = getApplication(),
+                    content = jsonString,
+                    fileName = "chottu_chat_${sanitizedTitle}_$timestamp.json",
+                    mimeType = "application/json"
+                )
+            } else {
+                val textString = com.example.util.ChatExportManager.generatePlainTextExport(session, messages)
+                com.example.util.ChatExportManager.saveAndShareExportFile(
+                    context = getApplication(),
+                    content = textString,
+                    fileName = "chottu_chat_${sanitizedTitle}_$timestamp.txt",
+                    mimeType = "text/plain"
+                )
+            }
+        }
     }
 
     override fun onCleared() {
